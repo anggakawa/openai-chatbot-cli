@@ -26,6 +26,7 @@ Optional Arguments
 - `--instruct/-t`: Specify custom instructions for the chatbot. (Optional)
 - `--input/-i`: Specify the input JSON file for chat history. (Default: chat_history.json)
 - `--output/-o`: Specify the output file for chat responses. (Default: output.md)
+- `-s`: Specify to use stream option. (Default: False)
 
 
 ## Custom Instructions
