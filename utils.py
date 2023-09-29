@@ -2,15 +2,27 @@ import os
 import json
 from datetime import datetime
 
+def read_markdown_file(filename="custom-instructions.md"):
+    try:
+        with open(filename, "r") as file:
+            return file.read()
+    except FileNotFoundError:
+        return ""
+
+def save_custom_instruction(custom_instruction, output):
+    with open(f"{output}.md", "w") as file:
+        file.write(custom_instruction)
+
 def save_chat_history(chat_history, output_file=False):
-    if not output_file:
-        today_date = datetime.now().strftime("%Y-%m-%d-%f")
-        output_file = f'history/chat_history_{today_date}.json'
-    # Ensure 'history' folder exist. If not, create it.
-    if not os.path.exists('history'):
-        os.makedirs('history')
-    with open(output_file, "w") as file:
-        json.dump(chat_history, file)
+    if len(chat_history) > 0:
+        if not output_file:
+            today_date = datetime.now().strftime("%Y-%m-%d-%f")
+            output_file = f'history/chat_history_{today_date}.json'
+        # Ensure 'history' folder exist. If not, create it.
+        if not os.path.exists('history'):
+            os.makedirs('history')
+        with open(output_file, "w") as file:
+            json.dump(chat_history, file)
 
 def print_output(output_file, response):
     with open(output_file, 'w') as output_file:

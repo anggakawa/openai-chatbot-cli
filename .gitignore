@@ -11,6 +11,7 @@ py310/
 history/
 chat_history_*
 output.md
+custom-instructions.md
 
 # Distribution / packaging
 .Python

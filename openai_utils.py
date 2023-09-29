@@ -11,6 +11,8 @@ from rich.progress import track
 from prompt_toolkit import print_formatted_text as print, HTML
 from prompt_toolkit.styles import Style
 
+import utils
+
 load_dotenv()
 
 openai.organization = os.getenv("OPENAI_ORG")
@@ -23,6 +25,7 @@ STREAM = False
 def set_custom_instruction(instructions):
     global CUSTOM_INSTRUCTIONS
     CUSTOM_INSTRUCTIONS = instructions
+    utils.save_custom_instruction(instructions, 'custom-instructions')
 
 def set_stream(choice):
     global STREAM
@@ -52,6 +55,7 @@ def stream_response(user_messages="", chat_history=None):
 
     return log_messages, response
 
+# not used anymore
 def create_chat_response(user_messages="", chat_history=None):
     console = Console()
 
