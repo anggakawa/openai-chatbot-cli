@@ -8,9 +8,8 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.progress import track
 
-from prompt_toolkit import print_formatted_text as print
-
-print('Hello world')
+from prompt_toolkit import print_formatted_text as print, HTML
+from prompt_toolkit.styles import Style
 
 load_dotenv()
 
@@ -32,6 +31,26 @@ def set_stream(choice):
 def list_openai_models():
     models = openai.Model.list()
     return models
+
+def stream_response(user_messages="", chat_history=None):
+    log_messages = []
+
+    if chat_history:
+        log_messages.extend(chat_history)
+    else:
+        log_messages.append({'role': 'system', 'content': CUSTOM_INSTRUCTIONS})
+
+    if user_messages:
+        user_message = {"role": "user", "content": user_messages.strip()}
+        log_messages.append(user_message)
+
+    response = openai.ChatCompletion.create(
+        model=OPENAI_MODEL,
+        messages=log_messages,
+        stream=STREAM
+    )
+
+    return log_messages, response
 
 def create_chat_response(user_messages="", chat_history=None):
     console = Console()
@@ -56,10 +75,17 @@ def create_chat_response(user_messages="", chat_history=None):
     answer = ""
 
     if STREAM:
+        prompt_style = Style.from_dict({
+            'prompt': 'ansigreen bold',
+            'input': '',
+        })
         for chunk in response:
             event_text = chunk['choices'][0]['delta']
             answer = answer + (event_text.get('content', ''))
-            print(event_text.get('content', ''), end='')
+            if event_text.get('content'):
+                print(HTML(f"<ansigreen>{event_text.get('content', '')}</ansigreen>"), end='', style=prompt_style)
+            else:
+                print('')
             # console.print(event_text.get('content', ''), end='', markup=True, style="green1")
     else:
         for i in track(response.choices[0].message.content, description="Loading..."):

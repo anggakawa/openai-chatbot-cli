@@ -1,55 +1,155 @@
 import argparse
-from openai_utils import create_chat_response, set_custom_instruction, set_stream
+
+import os
+from openai_utils import create_chat_response, set_custom_instruction, set_stream, stream_response
 import utils
-from rich.prompt import Prompt
-from rich.console import Console
-from prompt_toolkit import prompt
+
+from functools import partial
+
+from prompt_toolkit import print_formatted_text as print, HTML
+from prompt_toolkit import PromptSession
+from prompt_toolkit import Application
+from prompt_toolkit.layout.containers import VSplit, HSplit, Window, WindowAlign
+from prompt_toolkit.layout.layout import Layout
+from prompt_toolkit.widgets import Box, Label, TextArea, SearchToolbar, Frame, Button
+from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
+from prompt_toolkit.buffer import Buffer
+from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.styles import Style
+from prompt_toolkit.document import Document
+from prompt_toolkit.application.current import get_app
+from prompt_toolkit.key_binding.bindings.focus import focus_next, focus_previous
+
+import asyncio
+
+kb = KeyBindings()
+kb.add("tab")(focus_next)
+kb.add("s-tab")(focus_previous)
+
+chat_history = []
+file_to_write = False
+
+help_text = """
+Welcome !
+Press Control-C to exit.
+Press Tab or Shift+Tab to navigate.
+
+
+"""
+
+@kb.add('c-q')
+def exit_(event):
+    """
+    Pressing Ctrl-Q will exit the user interface.
+
+    Setting a return value means: quit the event loop that drives the user
+    interface and return this value from the `Application.run()` call.
+    """
+    utils.save_chat_history(chat_history, file_to_write)
+    event.app.exit()
+
+output_field = TextArea(style="class:output-field", text=help_text, scrollbar=True, wrap_lines=True, focus_on_click=True)
+search_field = SearchToolbar()  # For reverse search.
+input_field = TextArea(
+    height=5,
+    prompt=">>> ",
+    style="class:input-field",
+    multiline=True,
+    search_field=search_field,
+    focus_on_click=True,
+    width=90
+)
+
+def load_history(item):
+    global chat_history, file_to_write
+    path_history = f"./history/{item}"
+    chat_history = utils.get_chat_history(path_history)
+    file_to_write = path_history
+    output_field.buffer.document = Document(text="History loaded\n")
+    for history in chat_history:
+        if history['role'] == 'user':
+            output_field.buffer.insert_text(data=f"> You: {history['content']}", move_cursor=True)
+            output_field.buffer.insert_line_below()
+        elif history['role'] == 'assistant':
+            output_field.buffer.insert_text(data=f"> GPT: {history['content']}", move_cursor=True)
+            output_field.buffer.insert_line_below()
+
+def get_directory_contents(directory_path):
+    try:
+        return os.listdir(directory_path)
+    except:
+        return ['nothing here']
 
 def main():
-    console = Console()
-    parser = argparse.ArgumentParser(description="A simple command-line program")
-    
-    # Add command-line arguments
-    parser.add_argument('--chat', '-c', help='Chat')
+    set_stream(choice=True)
+
+    global chat_history
+
+    parser = argparse.ArgumentParser(description="A ChatGPT like in CLI")
     parser.add_argument('--instruct', '-t', help='Instruct', default=False)
-    parser.add_argument('--input', '-i', help='Input file', default=False)
-    parser.add_argument('--output', '-o', help='Output file', default='output.md')
-    parser.add_argument('-s', action="store_true", help='Stream')
-    parser.add_argument('-p', action="store_true", help='Prompt mode')
-    
-    chat = ''
 
     args = parser.parse_args()
-
-    # Load existing chat history from a JSON file if provided
-    chat_history = utils.get_chat_history(args.input)
-
     if args.instruct:
         set_custom_instruction(args.instruct)
     
-    if args.s:
-        set_stream(choice=True)
+    items = [Button(text=item, width=40, handler=partial(load_history, item)) for item in get_directory_contents("./history")]
 
-    if args.p:
-        response = ''
-        console.print("Welcome to Chatbot CLI Tool, type `\q` to quit", markup=True)
-        while True:
-            # chat = Prompt.ask("Enter your prompt", default="Hello")
-            chat = prompt("Enter your prompt: ", multiline=True)
-            if chat == '\q':
-                break
-            chat_history, response = create_chat_response(user_messages=chat, chat_history=chat_history)
-    elif args.chat:
-        chat = args.chat
-        # Create chat response and update chat history
-        chat_history, response = create_chat_response(user_messages=chat, chat_history=chat_history)
-    else:
-        console.print("You need to include `--chat` or `-p` to use the app!", markup=True)
-        return
+    container = HSplit(
+        [
+            VSplit([
+                # Window(FormattedTextControl(text="\n".join(get_directory_contents("./history")), show_cursor=True, focusable=True), width=40),
+                Box(body=HSplit(items, align="TOP"), width=40),
+                Window(width=1, char='|'),
+                output_field,
+            ], width=1),
+            Window(height=1, char="-", style="class:line"),
+            input_field,
+            search_field,
+        ]
+    )
 
-    # Save chat history to a JSON file
-    utils.save_chat_history(chat_history, args.input)
-    utils.print_output(args.output, response)
+    style = Style(
+        [
+            ("output-field", "bg:#000044 #ffffff"),
+            ("input-field", "bg:#000000 #ffffff"),
+            ("line", "#004400"),
+        ]
+    )
+
+    async def print_response(response, chat_history):
+        answer = ''
+        output_field.buffer.insert_text(data="> GPT: ", move_cursor=True)
+        for record in response:
+            event_text = record['choices'][0]['delta']
+            content = event_text.get('content', '')
+            answer = answer + (event_text.get('content', ''))
+            output_field.buffer.insert_text(data=content, move_cursor=True)
+            await asyncio.sleep(0)
+        assistant_message = {"role": "assistant", "content": answer}
+        chat_history.append(assistant_message)
+        output_field.buffer.insert_line_below()
+        output_field.read_only = True
+
+    async def accept(text_input):
+        global chat_history
+        output_field.buffer.cursor_position = len(output_field.buffer.text)
+        output_field.read_only = False
+        output_field.buffer.insert_text(data=f"> You: {text_input}", move_cursor=True)
+        output_field.buffer.insert_line_below()
+        log_message, response = stream_response(user_messages=text_input, chat_history=chat_history)
+        chat_history = log_message
+        await print_response(response, chat_history)
+    
+    def handle_input(buff):
+        asyncio.ensure_future(accept(buff.text))
+
+    input_field.accept_handler = handle_input
+
+    layout = Layout(container, focused_element=input_field)
+
+    app = Application(layout=layout, key_bindings=kb, full_screen=True, mouse_support=True, style=style, paste_mode=True)
+
+    app.run()
 
 if __name__ == "__main__":
     main()
