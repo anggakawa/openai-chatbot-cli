@@ -3,6 +3,7 @@
 This is a simple command-line program for interacting with a chatbot powered by OpenAI's GPT. You can use this tool to have conversations with the chatbot, customize its behavior with instructions, and save chat history.
 
 # Usage
+![Usage Tutorial](<assets/tutorial.gif>)
 
 ## Preparation
 To configure this tool and manage sensitive information, you can use environment variables. Create a `.env` file in the root directory of your project and add the following variables:
