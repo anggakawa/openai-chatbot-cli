@@ -1,10 +1,28 @@
 import os
 import json
+from datetime import datetime
 
-def save_chat_history(chat_history, output_file="chat_history.json"):
-    import json
-    with open(output_file, "w") as file:
-        json.dump(chat_history, file)
+def read_markdown_file(filename="custom-instructions.md"):
+    try:
+        with open(filename, "r") as file:
+            return file.read()
+    except FileNotFoundError:
+        return ""
+
+def save_custom_instruction(custom_instruction, output):
+    with open(f"{output}.md", "w") as file:
+        file.write(custom_instruction)
+
+def save_chat_history(chat_history, output_file=False):
+    if len(chat_history) > 0:
+        if not output_file:
+            today_date = datetime.now().strftime("%Y-%m-%d-%f")
+            output_file = f'history/chat_history_{today_date}.json'
+        # Ensure 'history' folder exist. If not, create it.
+        if not os.path.exists('history'):
+            os.makedirs('history')
+        with open(output_file, "w") as file:
+            json.dump(chat_history, file)
 
 def print_output(output_file, response):
     with open(output_file, 'w') as output_file:
@@ -13,15 +31,16 @@ def print_output(output_file, response):
 def get_chat_history(input):
     # Load existing chat history from a JSON file if provided
     chat_history = []
-    if os.path.exists(input):
-        with open(input, "r") as file:
-            file_contents = file.read()  # Read the file contents
-            if file_contents:  # Check if the file is not empty
-                loaded_data = json.loads(file_contents)  # Load the JSON data
-                if loaded_data:
-                    chat_history = loaded_data
+    if input:
+        if os.path.exists(input):
+            with open(input, "r") as file:
+                file_contents = file.read()  # Read the file contents
+                if file_contents:  # Check if the file is not empty
+                    loaded_data = json.loads(file_contents)  # Load the JSON data
+                    if loaded_data:
+                        chat_history = loaded_data
+                    else:
+                        print("The file exists, but it doesn't contain any chat history data.")
                 else:
-                    print("The file exists, but it doesn't contain any chat history data.")
-            else:
-                print("The file is empty.")
+                    print("The file is empty.")
     return chat_history

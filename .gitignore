@@ -8,8 +8,10 @@ __pycache__/
 
 # my files
 py310/
-chat_history.json
+history/
+chat_history_*
 output.md
+custom-instructions.md
 
 # Distribution / packaging
 .Python
